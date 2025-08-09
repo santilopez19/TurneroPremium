@@ -1,0 +1,39 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String
+  phone          String   // E.164
+  licensePlate   String
+  dateTime       DateTime
+  status         String   @default("confirmed") // confirmed | ready | done | canceled
+  reminderSent   Boolean  @default(false)
+  reminderSentAt DateTime?
+  readyAt        DateTime?
+  attended       Boolean  @default(false)
+  cancelToken    String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // En lugar de unique, dejamos capacidad controlada por lógica (hasta 2 por horario)
+  @@index([dateTime])
+}
+
+model AdminUser {
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  createdAt DateTime @default(now())
+}
+
