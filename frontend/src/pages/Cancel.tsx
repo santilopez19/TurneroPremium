@@ -5,7 +5,7 @@ type Info = {
   id: string
   firstName: string
   lastName: string
-  licensePlate: string
+  service: string
   phone: string
   dateTime: string
   status: string
@@ -46,7 +46,7 @@ export default function Cancel() {
         <div className="card">
           <p><b>Cliente:</b> {info.firstName} {info.lastName}</p>
           <p><b>Fecha:</b> {fecha} <b>Hora:</b> {hora}</p>
-          <p><b>Patente:</b> {info.licensePlate}</p>
+          <p><b>Servicio:</b> {info.service}</p>
           <p><b>Estado:</b> {info.status}</p>
           <button className="btn btn-primary" onClick={onCancel}>Cancelar turno</button>
           {message && <p className="form-message" style={{marginTop:12}}>{message}</p>}

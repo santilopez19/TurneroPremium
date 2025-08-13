@@ -11,7 +11,7 @@ export default function Booking() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
-  const [licensePlate, setLicensePlate] = useState('')
+  const [service, setService] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string>('')
 
@@ -27,13 +27,13 @@ export default function Booking() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedSlot) { setMessage('Seleccioná un horario.'); return }
-    if (!firstName || !lastName || !phone || !licensePlate) { setMessage('Completá tus datos.'); return }
+    if (!firstName || !lastName || !phone || !service) { setMessage('Completá tus datos.'); return }
     setLoading(true)
     setMessage('')
     try {
-      await createAppointment({ firstName, lastName, phone, licensePlate, date, time: selectedSlot } as any)
-      setMessage('¡Listo! Tu turno fue reservado. Te recordaremos 2 horas antes por WhatsApp.')
-      setFirstName(''); setLastName(''); setPhone(''); setLicensePlate(''); setSelectedSlot('')
+      await createAppointment({ firstName, lastName, phone, service, date, time: selectedSlot } as any)
+      setMessage('¡Listo! Tu turno fue reservado. Te recordaremos 30 minutos antes por WhatsApp.')
+      setFirstName(''); setLastName(''); setPhone(''); setService(''); setSelectedSlot('')
     } catch (err: any) {
       setMessage(err?.message || 'No se pudo reservar el turno. Intentá nuevamente.')
     } finally {
@@ -66,8 +66,16 @@ export default function Booking() {
             <label>WhatsApp
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ej: +54911XXXXXXXX" />
             </label>
-            <label>Patente
-              <input type="text" value={licensePlate} onChange={e => setLicensePlate(e.target.value.toUpperCase())} placeholder="Ej: AA123BB" />
+            <label>Servicio
+              <select value={service} onChange={e => setService(e.target.value)}>
+                <option value="">Seleccionar servicio</option>
+                <option value="Corte Clásico">Corte Clásico</option>
+                <option value="Corte Moderno">Corte Moderno</option>
+                <option value="Barba y Bigote">Barba y Bigote</option>
+                <option value="Corte + Barba">Corte + Barba</option>
+                <option value="Degradado">Degradado</option>
+                <option value="Otro">Otro</option>
+              </select>
             </label>
             <small>Usá formato E.164 (ej: +54911...) para recibir el recordatorio.</small>
           </div>

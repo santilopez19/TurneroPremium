@@ -9,7 +9,7 @@ export async function fetchAvailability(dateIso: string): Promise<string[]> {
   return data?.slots || []
 }
 
-export async function createAppointment(input: { firstName: string, lastName: string, phone: string, date: string, time: string }) {
+export async function createAppointment(input: { firstName: string, lastName: string, phone: string, service: string, date: string, time: string }) {
   const res = await fetch(`${API_URL}/api/appointments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -67,6 +67,28 @@ export async function runReminders(token: string) {
     headers: { Authorization: `Bearer ${token}` }
   })
   if (!res.ok) throw new Error('No se pudo ejecutar los recordatorios')
+  return res.json()
+}
+
+// Nuevas funciones para configuración del negocio
+export async function getBusinessConfig(token: string): Promise<any> {
+  const res = await fetch(`${API_URL}/api/admin/business-config`, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) throw new Error('Error al cargar configuración')
+  return res.json()
+}
+
+export async function updateBusinessConfig(config: any, token: string): Promise<any> {
+  const res = await fetch(`${API_URL}/api/admin/business-config`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(config)
+  })
+  if (!res.ok) throw new Error('Error al guardar configuración')
   return res.json()
 }
 

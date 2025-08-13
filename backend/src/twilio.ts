@@ -16,11 +16,11 @@ export async function sendWhatsApp(to: string, body: string) {
 
 export function buildReminderMessage(name: string, date: Date) {
   const hora = date.toTimeString().slice(0,5)
-  return `¡Hola ${name}! Te recordamos tu turno en Ecolavado a las ${hora}. Te esperamos.`
+  return `¡Hola ${name}! Te recordamos tu turno en Barbería a las ${hora}. Te esperamos.`
 }
 
 export function buildReadyMessage(name: string) {
-  return `¡Hola ${name}! Tu auto ya está listo en Ecolavado. Podés pasar a retirarlo. ¡Gracias!`
+  return `¡Hola ${name}! Tu corte ya está listo en Barbería. Podés pasar a retirarte. ¡Gracias!`
 }
 
 

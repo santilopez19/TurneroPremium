@@ -1,6 +1,6 @@
 # Turnero Premium – Monorepo
 
-Este proyecto contiene un turnero premium para un lavadero, con backend en Node.js (Express + TypeScript + Prisma/SQLite) y frontend en Vite + React.
+Este proyecto contiene un turnero premium para una barbería, con backend en Node.js (Express + TypeScript + Prisma/SQLite) y frontend en Vite + React.
 
 - Backend: `backend/` → API, autenticación admin JWT, recordatorios (cron), Twilio opcional
 - Frontend: `frontend/` → Sitio público + panel admin
@@ -39,7 +39,7 @@ npm install
 # PORT=4000
 # TIMEZONE=America/Argentina/Buenos_Aires
 # JWT_SECRET=super_secreto
-# ADMIN_EMAIL=admin@ecolavado.local
+# ADMIN_EMAIL=admin@barberia.local
 # ADMIN_PASSWORD=admin1234
 # DATABASE_URL="file:./dev.db"
 # TWILIO_ACCOUNT_SID=

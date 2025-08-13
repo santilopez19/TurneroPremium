@@ -15,7 +15,7 @@ model Appointment {
   firstName      String
   lastName       String
   phone          String   // E.164
-  licensePlate   String
+  service        String
   dateTime       DateTime
   status         String   @default("confirmed") // confirmed | ready | done | canceled
   reminderSent   Boolean  @default(false)
@@ -35,5 +35,18 @@ model AdminUser {
   email    String @unique
   password String
   createdAt DateTime @default(now())
+}
+
+model BusinessConfig {
+  id              String   @id @default(cuid())
+  openDays        String   // JSON array de días [1,2,3,4,5,6]
+  openStart       String   // "08:30"
+  openEnd         String   // "18:30"
+  slotDuration    Int      // minutos
+  maxSlotsPerTime Int      // capacidad por horario
+  blockedDates    String   // JSON array de fechas bloqueadas
+  blockedTimes    String   // JSON array de horarios bloqueados
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { adminLogin } from '../../services/api'
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('admin@ecolavado.local')
+  const [email, setEmail] = useState('admin@barberia.local')
   const [password, setPassword] = useState('admin1234')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)

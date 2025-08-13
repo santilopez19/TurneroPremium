@@ -6,6 +6,8 @@ import Booking from './pages/Booking'
 import AdminLogin from './pages/admin/Login'
 import Dashboard from './pages/admin/Dashboard'
 import History from './pages/admin/History'
+import Configuration from './pages/admin/Configuration'
+import Support from './pages/Support'
 import Cancel from './pages/Cancel'
 
 export default function App() {
@@ -19,6 +21,8 @@ export default function App() {
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/turnos" element={<Dashboard />} />
           <Route path="/admin/historial" element={<History />} />
+          <Route path="/admin/configuracion" element={<Configuration />} />
+          <Route path="/soporte" element={<Support />} />
           <Route path="/cancelar/:token" element={<Cancel />} />
         </Routes>
       </main>

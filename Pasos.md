@@ -17,7 +17,7 @@ Voy a abrir los archivos clave del backend (`index.ts`, `twilio.ts`, `seed.ts`) 
 
 Voy a revisar el cliente (`frontend/src/services/api.ts`) y un par de páginas para ver cómo llaman a la API (URL base, envs) y así darte el plan de deploy coherente entre front y back.
 
-Voy a darte un checklist claro, con la “ruta recomendada” para poner esto online rápido y estable. También te dejo alternativas (VPS con SQLite, o Postgres) por si preferís otra base.
+Voy a darte un checklist claro, con la "ruta recomendada" para poner esto online rápido y estable. También te dejo alternativas (VPS con SQLite, o Postgres) por si preferís otra base.
 
 ### Ruta recomendada (rápida y estable)
 - Backend: Render (Node service)
@@ -36,7 +36,7 @@ Voy a darte un checklist claro, con la “ruta recomendada” para poner esto on
 
 ### 2) Crear la base de datos en MongoDB Atlas
 - Crear cuenta en `https://www.mongodb.com/atlas`
-- Crear “Shared Cluster” (M0, gratis)
+- Crear "Shared Cluster" (M0, gratis)
 - Crear usuario de DB (user/pass) y habilitar IP Access (0.0.0.0/0 o IP de tu backend)
 - Obtener la cadena de conexión `mongodb+srv://.../turneros?retryWrites=true&w=majority`
 - Vas a usarla en `DATABASE_URL` del backend
@@ -58,7 +58,7 @@ model Appointment {
   firstName      String
   lastName       String
   phone          String
-  licensePlate   String
+  service        String
   dateTime       DateTime
   status         String   @default("confirmed")
   reminderSent   Boolean  @default(false)
@@ -81,7 +81,7 @@ model AdminUser {
 ```
 
 ### 3) Backend en Render
-- Conectá el repo a Render como “Web Service”
+- Conectá el repo a Render como "Web Service"
 - Build command (Render → Build Command):
   - `npm ci && npx prisma generate && npm run build`
 - Start command:
@@ -100,7 +100,7 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 ```
-- Primer despliegue: tras el build, corré una vez “Shell” o “Job” con:
+- Primer despliegue: tras el build, corré una vez "Shell" o "Job" con:
   - `npx prisma db push`
   - (opcional) crear admin en DB si no usás `ADMIN_EMAIL/ADMIN_PASSWORD`
 
@@ -152,15 +152,15 @@ VITE_API_URL=https://api.tudominio.com
 - Finalmente, descomentá los `sendWhatsApp(...)` en el backend para enviar mensajes reales.
 
 ### 7) Pruebas finales
-- Front: visitar `https://www.tudominio.com` → “Sacar turno”:
+- Front: visitar `https://www.tudominio.com` → "Sacar turno":
   - Seleccionar día/hora → crear turno
 - Admin:
   - Login con `ADMIN_EMAIL/ADMIN_PASSWORD`
-  - Ver Dashboard e Historia, marcar “listo”
+  - Ver Dashboard e Historia, marcar "listo"
 - Cancelación:
   - Probar `/cancel/:token` desde el front
 - Recordatorios:
-  - Hacer un turno dentro de 30’ y verificar que se marque `reminderSent` y que llegue WhatsApp si está habilitado.
+  - Hacer un turno dentro de 30' y verificar que se marque `reminderSent` y que llegue WhatsApp si está habilitado.
 
 ### 8) Alternativas y notas
 - Si NO querés Mongo ahora:
@@ -219,7 +219,7 @@ model Appointment {
   firstName      String
   lastName       String
   phone          String
-  licensePlate   String
+  service        String
   dateTime       DateTime
   status         String   @default("confirmed")
   reminderSent   Boolean  @default(false)
@@ -313,7 +313,7 @@ Cómo conectarlos:
 - En Vercel: agrega tu dominio. Te va a indicar qué registros crear en Namecheap.
   - `A @ -> 76.76.21.21` (apex)
   - `CNAME www -> cname.vercel-dns.com`
-- En Render: copia el “External URL” de tu servicio (ej. `tu-api.onrender.com`).
+- En Render: copia el "External URL" de tu servicio (ej. `tu-api.onrender.com`).
   - `CNAME api -> tu-api.onrender.com`
 - En el frontend (Vercel) setea `VITE_API_URL=https://api.tudominio.com`
 

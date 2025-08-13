@@ -6,7 +6,7 @@ type Appt = {
   firstName: string
   lastName: string
   phone: string
-  licensePlate: string
+  service: string
   dateTime: string
   status?: string
 }
@@ -37,8 +37,9 @@ export default function Dashboard() {
         <h2>Turnos agendados</h2>
         <p className="form-message">Tenés {todayCount} turnos para hoy</p>
         <div style={{display:'flex', gap:12, margin:'12px 0', alignItems:'center', flexWrap:'wrap'}}>
-          <input placeholder="Buscar por nombre o patente" value={q} onChange={e=>setQ(e.target.value)} style={{padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'#0f1517', color:'var(--text)'}} />
+          <input placeholder="Buscar por nombre o servicio" value={q} onChange={e=>setQ(e.target.value)} style={{padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'#0f1517', color:'var(--text)'}} />
           <a className="btn btn-secondary" href="/admin/historial">Ver historial</a>
+          <a className="btn btn-secondary" href="/admin/configuracion">Configuración</a>
         </div>
         {error && <p className="form-message">{error}</p>}
         <div className="card">
@@ -49,13 +50,13 @@ export default function Dashboard() {
                 <th>Hora</th>
                 <th>Cliente</th>
                 <th>WhatsApp</th>
-                <th>Patente</th>
+                <th>Servicio</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {items.filter(a => {
-                const text = `${a.firstName} ${a.lastName} ${a.licensePlate}`.toLowerCase()
+                const text = `${a.firstName} ${a.lastName} ${a.service}`.toLowerCase()
                 return text.includes(q.trim().toLowerCase())
               }).map(a => {
                 const d = new Date(a.dateTime)
@@ -73,7 +74,7 @@ export default function Dashboard() {
                     <td className="td-hora">{hora}</td>
                     <td className="td-cliente">{a.firstName} {a.lastName}</td>
                     <td className="td-wa">{a.phone}</td>
-                    <td className="td-patente">{a.licensePlate}</td>
+                    <td className="td-patente">{a.service}</td>
                     <td>
                       <button className={a.status === 'ready' ? 'btn btn-muted' : 'btn btn-primary'} onClick={onReady} disabled={a.status === 'ready'}>
                         {a.status === 'ready' ? 'Listo' : 'Marcar listo'}

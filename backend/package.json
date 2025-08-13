@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend para sistema de turnos de barbería",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
@@ -13,7 +13,7 @@
     "seed": "ts-node src/seed.ts",
     "test": "jest"
   },
-  "keywords": [],
+  "keywords": ["barberia", "turnos", "api"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",

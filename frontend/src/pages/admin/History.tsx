@@ -6,7 +6,7 @@ type Appt = {
   firstName: string
   lastName: string
   phone: string
-  licensePlate: string
+  service: string
   dateTime: string
 }
 
@@ -23,17 +23,17 @@ export default function History() {
     const q = query.trim().toLowerCase()
     const filtered = !q ? list : list.filter((a: Appt) =>
       `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
-      a.licensePlate.toLowerCase().includes(q)
+      a.service.toLowerCase().includes(q)
     )
     setItems(filtered)
     // CSV simple
-    const header = 'Fecha,Hora,Cliente,WhatsApp,Patente\n'
+    const header = 'Fecha,Hora,Cliente,WhatsApp,Servicio\n'
     const rows = filtered.map(a => {
       const d = new Date(a.dateTime)
       const fecha = d.toLocaleDateString('es-AR')
       const hora = d.toTimeString().slice(0,5)
       const cliente = `${a.firstName} ${a.lastName}`
-      return `${fecha},${hora},${cliente},${a.phone},${a.licensePlate}`
+      return `${fecha},${hora},${cliente},${a.phone},${a.service}`
     }).join('\n')
     setCsv(header + rows)
   }
@@ -52,8 +52,8 @@ export default function History() {
             <label>Hasta
               <input type="datetime-local" value={to} onChange={e=>setTo(e.target.value)} />
             </label>
-            <label>Búsqueda (nombre o patente)
-              <input type="text" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Ej: Juan o AA123BB" />
+            <label>Búsqueda (nombre o servicio)
+              <input type="text" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Ej: Juan o Corte Clásico" />
             </label>
           </div>
           <div>
@@ -71,7 +71,7 @@ export default function History() {
                 <th>Hora</th>
                 <th>Cliente</th>
                 <th>WhatsApp</th>
-                <th>Patente</th>
+                <th>Servicio</th>
               </tr>
             </thead>
             <tbody>
@@ -85,7 +85,7 @@ export default function History() {
                     <td className="td-hora">{hora}</td>
                     <td className="td-cliente">{a.firstName} {a.lastName}</td>
                     <td className="td-wa">{a.phone}</td>
-                    <td className="td-patente">{a.licensePlate}</td>
+                    <td className="td-patente">{a.service}</td>
                   </tr>
                 )
               })}
