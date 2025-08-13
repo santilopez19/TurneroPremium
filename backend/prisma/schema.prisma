@@ -37,3 +37,56 @@ model AdminUser {
   createdAt DateTime @default(now())
 }
 
+// Nueva entidad para configuración del negocio
+model BusinessConfig {
+  id                    String @id @default(cuid())
+  openTime              String // formato "HH:mm" (ej: "08:30")
+  closeTime             String // formato "HH:mm" (ej: "18:30")
+  slotDuration          Int    // duración del turno en minutos (ej: 60)
+  maxAppointmentsPerSlot Int   // máximo de turnos por horario (ej: 2)
+  isActive              Boolean @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// Nueva entidad para bloquear fechas específicas
+model BlockedDate {
+  id          String @id @default(cuid())
+  date        String // formato "YYYY-MM-DD"
+  reason      String? // motivo del bloqueo (opcional)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([date])
+}
+
+// Nueva entidad para bloquear horarios específicos
+model BlockedTimeSlot {
+  id          String @id @default(cuid())
+  date        String // formato "YYYY-MM-DD"
+  time        String // formato "HH:mm"
+  reason      String? // motivo del bloqueo (opcional)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([date, time])
+}
+
+// Nueva entidad para mensajes de soporte
+model SupportMessage {
+  id          String @id @default(cuid())
+  category    String // general, tecnico, facturacion, mejoras, bug, otro
+  priority    String // baja, media, alta, urgente
+  name        String? // nombre del cliente (opcional)
+  email       String? // email del cliente (opcional)
+  phone       String? // teléfono del cliente (opcional)
+  message     String // mensaje del cliente
+  status      String @default("nuevo") // nuevo, en_proceso, resuelto, cerrado
+  response    String? // respuesta del desarrollador
+  respondedAt DateTime? // cuando se respondió
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

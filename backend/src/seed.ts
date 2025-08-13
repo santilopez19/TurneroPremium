@@ -1,70 +1,48 @@
-import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-function* nameGen() {
-  const first = ['Juan','Ana','Luis','María','Sofía','Carlos','Leo','Julia']
-  const last = ['Pérez','Gómez','López','Rodríguez','Fernández','Sosa','Martínez']
-  let i = 0
-  while (true) { yield { firstName: first[i % first.length], lastName: last[(i*3) % last.length] }; i++ }
-}
-
-function plates(i: number) {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-  const a = letters[i % 26], b = letters[(i+7)%26]
-  const num = String(100 + (i*37 % 900))
-  return `${a}${b}${num}`
-}
-
 async function main() {
-  // Usuario admin de prueba si no existe
-  const email = process.env.ADMIN_EMAIL || 'admin@ecolavado.local'
-  const password = process.env.ADMIN_PASSWORD || 'admin1234'
-  const existing = await prisma.adminUser.findUnique({ where: { email } }).catch(() => null)
-  if (!existing) {
-    await prisma.adminUser.create({ data: { email, password } })
-    console.log('Admin seed creado:', email)
-  } else {
-    console.log('Admin ya existe:', email)
-  }
+  console.log('🌱 Iniciando seed...')
 
-  // Limpiar turnos anteriores para mock
-  await prisma.appointment.deleteMany({})
-
-  // Crear turnos mock en próximos 6 días (sin domingos), horarios 08:30..18:30, hasta 2 por slot
-  const gen = nameGen()
-  let idx = 0
-  const base = new Date()
-  for (let d = 0; d <= 6; d++) {
-    const day = new Date(base)
-    day.setDate(base.getDate() + d)
-    if (day.getDay() === 0) continue // domingo
-
-    for (let h = 8; h <= 18; h++) {
-      const slot = new Date(day)
-      slot.setHours(h, 30, 0, 0)
-      // pseudo-aleatorio: ocupar algunos slots
-      const r = (h * 17 + d * 13) % 4 // 0..3
-      const toCreate = r === 0 ? 0 : (r === 1 ? 1 : (r === 2 ? 2 : 1))
-      for (let c = 0; c < toCreate; c++) {
-        const next = gen.next()
-        const person = next.value as { firstName: string; lastName: string }
-        await prisma.appointment.create({
-          data: {
-            firstName: person.firstName,
-            lastName: person.lastName,
-            phone: '+5493510000000',
-            licensePlate: plates(idx++),
-            dateTime: slot,
-          }
-        })
-      }
+  // Crear configuración por defecto del negocio
+  const defaultConfig = await prisma.businessConfig.upsert({
+    where: { id: 'default-config' },
+    update: {},
+    create: {
+      id: 'default-config',
+      openTime: '08:30',
+      closeTime: '18:30',
+      slotDuration: 60,
+      maxAppointmentsPerSlot: 2,
+      isActive: true
     }
-  }
-  console.log('Seed de turnos mock creado')
+  })
+
+  console.log('✅ Configuración del negocio creada:', defaultConfig)
+
+  // Crear usuario admin por defecto si no existe
+  const adminUser = await prisma.adminUser.upsert({
+    where: { email: 'admin@ecolavado.local' },
+    update: {},
+    create: {
+      email: 'admin@ecolavado.local',
+      password: 'admin1234'
+    }
+  })
+
+  console.log('✅ Usuario admin creado:', adminUser.email)
+
+  console.log('🎉 Seed completado exitosamente!')
 }
 
-main().finally(() => prisma.$disconnect())
+main()
+  .catch((e) => {
+    console.error('❌ Error en seed:', e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
 
 

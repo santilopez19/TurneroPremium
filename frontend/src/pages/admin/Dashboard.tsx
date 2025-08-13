@@ -39,6 +39,10 @@ export default function Dashboard() {
         <div style={{display:'flex', gap:12, margin:'12px 0', alignItems:'center', flexWrap:'wrap'}}>
           <input placeholder="Buscar por nombre o patente" value={q} onChange={e=>setQ(e.target.value)} style={{padding:'8px', borderRadius:8, border:'1px solid var(--border)', background:'#0f1517', color:'var(--text)'}} />
           <a className="btn btn-secondary" href="/admin/historial">Ver historial</a>
+          <a className="btn btn-primary" href="/admin/disponibilidad">Gestionar Disponibilidad</a>
+          <a className="btn btn-secondary" href="/admin/soporte" style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+            🆘 Soporte
+          </a>
         </div>
         {error && <p className="form-message">{error}</p>}
         <div className="card">

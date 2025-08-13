@@ -6,6 +6,9 @@ import Booking from './pages/Booking'
 import AdminLogin from './pages/admin/Login'
 import Dashboard from './pages/admin/Dashboard'
 import History from './pages/admin/History'
+import Availability from './pages/admin/Availability'
+import Support from './pages/admin/Support'
+import SupportMessages from './pages/admin/SupportMessages'
 import Cancel from './pages/Cancel'
 
 export default function App() {
@@ -19,6 +22,9 @@ export default function App() {
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/turnos" element={<Dashboard />} />
           <Route path="/admin/historial" element={<History />} />
+          <Route path="/admin/disponibilidad" element={<Availability />} />
+          <Route path="/admin/soporte" element={<Support />} />
+          <Route path="/admin/mensajes-soporte" element={<SupportMessages />} />
           <Route path="/cancelar/:token" element={<Cancel />} />
         </Routes>
       </main>

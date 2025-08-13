@@ -30,21 +30,47 @@ function buildLocalDate(dateIso: string, timeHHmm: string): Date {
 function pad(n: number) { return String(n).padStart(2, '0') }
 function cryptoRandom() { return crypto.randomBytes(12).toString('hex') }
 
-// Business rules
-// Horario: 08:30 a 18:30, capacidad 2 por horario
-const OPEN_START = { hour: 8, minute: 30 }
-const CLOSE_END = { hour: 18, minute: 30 }
-const SLOT_MINUTES = 60
-
-function generateDailySlots(dateIso: string): string[] {
-  // Horas: 08:30, 09:30, ..., 18:30
-  const slots: string[] = []
-  for (let h = OPEN_START.hour; h <= CLOSE_END.hour; h++) {
-    const hh = String(h).padStart(2, '0')
-    const mm = h === OPEN_START.hour ? OPEN_START.minute : 30
-    const display = `${hh}:${String(mm).padStart(2, '0')}`
-    slots.push(display)
+// Función para obtener configuración del negocio
+async function getBusinessConfig() {
+  const config = await prisma.businessConfig.findFirst({ where: { isActive: true } })
+  if (!config) {
+    // Configuración por defecto si no existe
+    return {
+      openTime: '08:30',
+      closeTime: '18:30',
+      slotDuration: 60,
+      maxAppointmentsPerSlot: 2
+    }
   }
+  return config
+}
+
+// Función para generar horarios disponibles basada en configuración
+async function generateDailySlots(dateIso: string): Promise<string[]> {
+  const config = await getBusinessConfig()
+  
+  // Parsear horarios de apertura y cierre
+  const [openHour, openMinute] = config.openTime.split(':').map(Number)
+  const [closeHour, closeMinute] = config.closeTime.split(':').map(Number)
+  
+  const slots: string[] = []
+  let currentHour = openHour
+  let currentMinute = openMinute
+  
+  while (currentHour < closeHour || (currentHour === closeHour && currentMinute < closeMinute)) {
+    const hh = String(currentHour).padStart(2, '0')
+    const mm = String(currentMinute).padStart(2, '0')
+    const display = `${hh}:${mm}`
+    slots.push(display)
+    
+    // Avanzar al siguiente slot
+    currentMinute += config.slotDuration
+    if (currentMinute >= 60) {
+      currentHour += Math.floor(currentMinute / 60)
+      currentMinute = currentMinute % 60
+    }
+  }
+  
   return slots
 }
 
@@ -53,44 +79,76 @@ app.get('/api/availability', async (req, res) => {
   const dateIso = String(req.query.date || '')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return res.status(400).json({ message: 'Fecha inválida' })
 
-  const all = generateDailySlots(dateIso)
+  try {
+    // Verificar si la fecha está bloqueada
+    const blockedDate = await prisma.blockedDate.findFirst({
+      where: { date: dateIso, isActive: true }
+    })
+    
+    if (blockedDate) {
+      return res.json({ date: dateIso, slots: [], blocked: true, reason: blockedDate.reason })
+    }
 
-  // Calcular inicio y fin del día en hora local
-  const [y, m, d] = dateIso.split('-').map(Number)
-  const startLocal = new Date(y, (m - 1), d, 0, 0, 0, 0)
-  const endLocal = new Date(y, (m - 1), d, 23, 59, 59, 999)
+    const all = await generateDailySlots(dateIso)
 
-  const busy = await prisma.appointment.findMany({
-    where: {
-      dateTime: {
-        gte: startLocal,
-        lt: endLocal,
-      }
-    },
-    select: { dateTime: true }
-  })
+    // Calcular inicio y fin del día en hora local
+    const [y, m, d] = dateIso.split('-').map(Number)
+    const startLocal = new Date(y, (m - 1), d, 0, 0, 0, 0)
+    const endLocal = new Date(y, (m - 1), d, 23, 59, 59, 999)
 
-  // Contar reservas por horario local
-  const countByTime = new Map<string, number>()
-  for (const b of busy) {
-    const hh = pad(new Date(b.dateTime).getHours())
-    const mm = pad(new Date(b.dateTime).getMinutes())
-    const key = `${hh}:${mm}`
-    countByTime.set(key, (countByTime.get(key) || 0) + 1)
+    const busy = await prisma.appointment.findMany({
+      where: {
+        dateTime: {
+          gte: startLocal,
+          lt: endLocal,
+        }
+      },
+      select: { dateTime: true }
+    })
+
+    // Obtener configuración para la capacidad máxima
+    const config = await getBusinessConfig()
+
+    // Contar reservas por horario local
+    const countByTime = new Map<string, number>()
+    for (const b of busy) {
+      const hh = pad(new Date(b.dateTime).getHours())
+      const mm = pad(new Date(b.dateTime).getMinutes())
+      const key = `${hh}:${mm}`
+      countByTime.set(key, (countByTime.get(key) || 0) + 1)
+    }
+
+    // Obtener horarios bloqueados para esta fecha
+    const blockedTimeSlots = await prisma.blockedTimeSlot.findMany({
+      where: { date: dateIso, isActive: true }
+    })
+    
+    const blockedTimes = new Set(blockedTimeSlots.map(bt => bt.time))
+
+    // Disponibles si hay menos del máximo de reservas en ese horario y no está bloqueado
+    let free = all.filter(s => {
+      const isBlocked = blockedTimes.has(s)
+      const isFull = (countByTime.get(s) || 0) >= config.maxAppointmentsPerSlot
+      return !isBlocked && !isFull
+    })
+
+    // Si es el día de hoy, ocultar horarios de la hora actual hacia atrás
+    const now = new Date()
+    const todayIso = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    if (dateIso === todayIso) {
+      const nowHour = now.getHours()
+      const nowMinute = now.getMinutes()
+      free = free.filter(t => {
+        const [slotHour, slotMinute] = t.split(':').map(Number)
+        return slotHour > nowHour || (slotHour === nowHour && slotMinute > nowMinute)
+      })
+    }
+
+    res.json({ date: dateIso, slots: free })
+  } catch (error) {
+    console.error('Error en availability:', error)
+    res.status(500).json({ message: 'Error interno del servidor' })
   }
-
-  // Disponibles si hay menos de 2 reservas en ese horario
-  let free = all.filter(s => (countByTime.get(s) || 0) < 2)
-
-  // Si es el día de hoy, ocultar horarios de la hora actual hacia atrás (ej.: a las 12 no mostrar 12:30)
-  const now = new Date()
-  const todayIso = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-  if (dateIso === todayIso) {
-    const nowHour = now.getHours()
-    free = free.filter(t => parseInt(t.slice(0, 2), 10) > nowHour)
-  }
-
-  res.json({ date: dateIso, slots: free })
 })
 
 const CreateAppointment = z.object({
@@ -108,9 +166,24 @@ app.post('/api/appointments', async (req, res) => {
   const { firstName, lastName, phone, licensePlate, date, time } = parsed.data
   const dateTimeUtc = buildLocalDate(date, time)
   try {
-    // Capacidad 2 por horario
+    // Verificar si la fecha o horario están bloqueados
+    const blockedDate = await prisma.blockedDate.findFirst({
+      where: { date, isActive: true }
+    })
+    if (blockedDate) return res.status(409).json({ message: 'Esta fecha no está disponible' })
+
+    const blockedTimeSlot = await prisma.blockedTimeSlot.findFirst({
+      where: { date, time, isActive: true }
+    })
+    if (blockedTimeSlot) return res.status(409).json({ message: 'Este horario no está disponible' })
+
+    // Obtener configuración para la capacidad máxima
+    const config = await getBusinessConfig()
+    
+    // Verificar capacidad por horario
     const count = await prisma.appointment.count({ where: { dateTime: dateTimeUtc } })
-    if (count >= 2) return res.status(409).json({ message: 'No hay cupo para ese horario' })
+    if (count >= config.maxAppointmentsPerSlot) return res.status(409).json({ message: 'No hay cupo para ese horario' })
+    
     // Restricción: máximo 2 turnos por día por número de WhatsApp
     const startDay = new Date(dateTimeUtc); startDay.setHours(0,0,0,0)
     const endDay = new Date(dateTimeUtc); endDay.setHours(23,59,59,999)
@@ -210,6 +283,334 @@ cron.schedule('5 0 * * *', async () => {
 }, { timezone: TZ })
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
+
+// Endpoints para gestión de configuración del negocio
+app.get('/api/admin/business-config', auth, async (_req, res) => {
+  try {
+    const config = await prisma.businessConfig.findFirst({ where: { isActive: true } })
+    res.json(config)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener configuración' })
+  }
+})
+
+app.put('/api/admin/business-config', auth, async (req, res) => {
+  try {
+    const { openTime, closeTime, slotDuration, maxAppointmentsPerSlot } = req.body
+    
+    // Validaciones básicas
+    if (!openTime || !closeTime || !slotDuration || !maxAppointmentsPerSlot) {
+      return res.status(400).json({ message: 'Todos los campos son requeridos' })
+    }
+    
+    if (slotDuration < 15 || slotDuration > 120) {
+      return res.status(400).json({ message: 'La duración del turno debe estar entre 15 y 120 minutos' })
+    }
+    
+    if (maxAppointmentsPerSlot < 1 || maxAppointmentsPerSlot > 10) {
+      return res.status(400).json({ message: 'La capacidad por horario debe estar entre 1 y 10' })
+    }
+
+    const config = await prisma.businessConfig.upsert({
+      where: { id: 'default-config' },
+      update: { openTime, closeTime, slotDuration, maxAppointmentsPerSlot },
+      create: { 
+        id: 'default-config',
+        openTime, 
+        closeTime, 
+        slotDuration, 
+        maxAppointmentsPerSlot,
+        isActive: true 
+      }
+    })
+    
+    res.json(config)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar configuración' })
+  }
+})
+
+// Endpoints para gestión de fechas bloqueadas
+app.get('/api/admin/blocked-dates', auth, async (req, res) => {
+  try {
+    const { from, to } = req.query
+    const where: any = { isActive: true }
+    
+    if (from && to) {
+      where.date = { gte: String(from), lte: String(to) }
+    }
+    
+    const blockedDates = await prisma.blockedDate.findMany({ 
+      where, 
+      orderBy: { date: 'asc' } 
+    })
+    res.json(blockedDates)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener fechas bloqueadas' })
+  }
+})
+
+app.post('/api/admin/blocked-dates', auth, async (req, res) => {
+  try {
+    const { date, reason } = req.body
+    
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ message: 'Fecha inválida' })
+    }
+    
+    const blockedDate = await prisma.blockedDate.upsert({
+      where: { date },
+      update: { reason, isActive: true },
+      create: { date, reason, isActive: true }
+    })
+    
+    res.json(blockedDate)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al bloquear fecha' })
+  }
+})
+
+app.delete('/api/admin/blocked-dates/:date', auth, async (req, res) => {
+  try {
+    const { date } = req.params
+    
+    await prisma.blockedDate.updateMany({
+      where: { date },
+      data: { isActive: false }
+    })
+    
+    res.json({ message: 'Fecha desbloqueada' })
+  } catch (error) {
+    res.status(500).json({ message: 'Error al desbloquear fecha' })
+  }
+})
+
+// Endpoints para gestión de horarios bloqueados
+app.get('/api/admin/blocked-time-slots', auth, async (req, res) => {
+  try {
+    const { date } = req.query
+    const where: any = { isActive: true }
+    
+    if (date) {
+      where.date = String(date)
+    }
+    
+    const blockedTimeSlots = await prisma.blockedTimeSlot.findMany({ 
+      where, 
+      orderBy: [{ date: 'asc' }, { time: 'asc' }] 
+    })
+    res.json(blockedTimeSlots)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener horarios bloqueados' })
+  }
+})
+
+app.post('/api/admin/blocked-time-slots', auth, async (req, res) => {
+  try {
+    const { date, time, reason } = req.body
+    
+    if (!date || !time || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
+      return res.status(400).json({ message: 'Fecha u horario inválido' })
+    }
+    
+    const blockedTimeSlot = await prisma.blockedTimeSlot.upsert({
+      where: { date_time: { date, time } },
+      update: { reason, isActive: true },
+      create: { date, time, reason, isActive: true }
+    })
+    
+    res.json(blockedTimeSlot)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al bloquear horario' })
+  }
+})
+
+app.delete('/api/admin/blocked-time-slots/:date/:time', auth, async (req, res) => {
+  try {
+    const { date, time } = req.params
+    
+    await prisma.blockedTimeSlot.updateMany({
+      where: { date, time },
+      data: { isActive: false }
+    })
+    
+    res.json({ message: 'Horario desbloqueado' })
+  } catch (error) {
+    res.status(500).json({ message: 'Error al desbloquear horario' })
+  }
+})
+
+// Endpoint para obtener disponibilidad futura (admin)
+app.get('/api/admin/availability', auth, async (req, res) => {
+  try {
+    const { from, to } = req.query
+    const fromDate = String(from || '')
+    const toDate = String(to || '')
+    
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ message: 'Rango de fechas requerido' })
+    }
+    
+    const availability = []
+    const currentDate = new Date(fromDate)
+    const endDate = new Date(toDate)
+    
+    while (currentDate <= endDate) {
+      const dateIso = currentDate.toISOString().split('T')[0]
+      
+      // Verificar si la fecha está bloqueada
+      const blockedDate = await prisma.blockedDate.findFirst({
+        where: { date: dateIso, isActive: true }
+      })
+      
+      if (blockedDate) {
+        availability.push({
+          date: dateIso,
+          blocked: true,
+          reason: blockedDate.reason,
+          slots: []
+        })
+      } else {
+        // Generar horarios disponibles
+        const allSlots = await generateDailySlots(dateIso)
+        
+        // Obtener horarios bloqueados
+        const blockedTimeSlots = await prisma.blockedTimeSlot.findMany({
+          where: { date: dateIso, isActive: true }
+        })
+        const blockedTimes = new Set(blockedTimeSlots.map(bt => bt.time))
+        
+        // Obtener turnos existentes
+        const startLocal = new Date(currentDate)
+        startLocal.setHours(0, 0, 0, 0)
+        const endLocal = new Date(currentDate)
+        endLocal.setHours(23, 59, 59, 999)
+        
+        const busy = await prisma.appointment.findMany({
+          where: {
+            dateTime: { gte: startLocal, lt: endLocal }
+          },
+          select: { dateTime: true }
+        })
+        
+        const config = await getBusinessConfig()
+        const countByTime = new Map<string, number>()
+        
+        for (const b of busy) {
+          const hh = pad(new Date(b.dateTime).getHours())
+          const mm = pad(new Date(b.dateTime).getMinutes())
+          const key = `${hh}:${mm}`
+          countByTime.set(key, (countByTime.get(key) || 0) + 1)
+        }
+        
+        // Filtrar horarios disponibles
+        const availableSlots = allSlots.filter(s => {
+          const isBlocked = blockedTimes.has(s)
+          const isFull = (countByTime.get(s) || 0) >= config.maxAppointmentsPerSlot
+          return !isBlocked && !isFull
+        })
+        
+        availability.push({
+          date: dateIso,
+          blocked: false,
+          slots: availableSlots,
+          totalSlots: allSlots.length,
+          blockedSlots: blockedTimeSlots.length,
+          bookedSlots: busy.length
+        })
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+    
+    res.json(availability)
+  } catch (error) {
+    console.error('Error en admin availability:', error)
+    res.status(500).json({ message: 'Error interno del servidor' })
+  }
+})
+
+// Endpoints para gestión de mensajes de soporte
+app.post('/api/support', async (req, res) => {
+  try {
+    const { category, priority, name, email, phone, message } = req.body
+    
+    // Validaciones básicas
+    if (!category || !priority || !message) {
+      return res.status(400).json({ message: 'Categoría, prioridad y mensaje son requeridos' })
+    }
+    
+    if (message.trim().length < 10) {
+      return res.status(400).json({ message: 'El mensaje debe tener al menos 10 caracteres' })
+    }
+    
+    const supportMessage = await prisma.supportMessage.create({
+      data: {
+        category,
+        priority,
+        name: name || null,
+        email: email || null,
+        phone: phone || null,
+        message: message.trim()
+      }
+    })
+    
+    res.json(supportMessage)
+  } catch (error) {
+    console.error('Error al crear mensaje de soporte:', error)
+    res.status(500).json({ message: 'Error interno del servidor' })
+  }
+})
+
+app.get('/api/admin/support-messages', auth, async (req, res) => {
+  try {
+    const { status, priority, category } = req.query
+    const where: any = {}
+    
+    if (status) where.status = String(status)
+    if (priority) where.priority = String(priority)
+    if (category) where.category = String(category)
+    
+    const messages = await prisma.supportMessage.findMany({
+      where,
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    })
+    
+    res.json(messages)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener mensajes de soporte' })
+  }
+})
+
+app.put('/api/admin/support-messages/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { status, response } = req.body
+    
+    if (!status && !response) {
+      return res.status(400).json({ message: 'Status o respuesta son requeridos' })
+    }
+    
+    const updateData: any = {}
+    if (status) updateData.status = status
+    if (response) {
+      updateData.response = response
+      updateData.respondedAt = new Date()
+    }
+    
+    const updatedMessage = await prisma.supportMessage.update({
+      where: { id },
+      data: updateData
+    })
+    
+    res.json(updatedMessage)
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar mensaje de soporte' })
+  }
+})
 
 // Endpoint para ejecutar recordatorios manualmente (admin)
 app.post('/api/admin/run-reminders', auth, async (_req, res) => {
